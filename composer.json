@@ -1,0 +1,64 @@
+{
+    "name": "attestwire/attestwire-php",
+    "description": "Validate EN 16931 e-invoices (XRechnung, Factur-X/ZUGFeRD, Peppol BIS 3) with the hosted Attestwire API. Includes an adapter for horstoeko/invoicesuite's validator so its users can validate without a Java KoSIT install.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "e-invoice",
+        "einvoice",
+        "e-invoicing",
+        "en16931",
+        "xrechnung",
+        "factur-x",
+        "facturx",
+        "zugferd",
+        "peppol",
+        "ubl",
+        "cii",
+        "invoice",
+        "vat",
+        "compliance",
+        "invoicesuite"
+    ],
+    "homepage": "https://attestwire.com",
+    "authors": [
+        {
+            "name": "Attestwire",
+            "email": "hello@attestwire.com"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/attestwire/attestwire-php/issues",
+        "source": "https://github.com/attestwire/attestwire-php",
+        "docs": "https://api.attestwire.com/docs"
+    },
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "ext-curl": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    },
+    "suggest": {
+        "horstoeko/invoicesuite": "Enables Attestwire\\InvoiceSuite\\AttestwireDocumentValidator, a drop-in EN 16931 validator for horstoeko/invoicesuite (same abstract base as its own KoSIT and DocuFlair validators) — validate without a Java KoSIT install. Needs PHP >=8.2 (invoicesuite's own floor) and is deliberately NOT a require-dev of this package: composer install must succeed on this package's own PHP >=8.1 floor with nothing extra. Add it yourself — `composer require --dev horstoeko/invoicesuite:'>=0.0.30'` — to also exercise tests/InvoiceSuite/AttestwireDocumentValidatorTest.php; it self-skips otherwise."
+    },
+    "autoload": {
+        "psr-4": {
+            "Attestwire\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Attestwire\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

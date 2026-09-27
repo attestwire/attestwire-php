@@ -1,0 +1,68 @@
+name: CI
+
+# Runs the PHPUnit suite on every supported PHP version. On PHP 8.2 and
+# later it also installs horstoeko/invoicesuite, so the InvoiceSuite
+# adapter's tests run instead of skipping.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: "PHP ${{ matrix.php }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.1", "8.2", "8.3", "8.4"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: json, curl
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Install dependencies (core only — must succeed on PHP 8.1)
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Lint PHP syntax
+        run: find src tests -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      # horstoeko/invoicesuite needs PHP >=8.2 and is not a require-dev of this
+      # package (see composer.json's `suggest`), so it's added here only on the
+      # matrix legs that can satisfy it. On PHP 8.1,
+      # tests/InvoiceSuite/AttestwireDocumentValidatorTest.php self-skips.
+      - name: Add horstoeko/invoicesuite (PHP >= 8.2 only)
+        if: matrix.php != '8.1'
+        run: composer require --dev --no-interaction --prefer-dist "horstoeko/invoicesuite:>=0.0.30"
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit --colors=always
+
+  static-analysis:
+    name: "Composer / autoload sanity"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: json, curl
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Check the autoloader resolves every class (dump-autoload --optimize catches a bad PSR-4 mapping)
+        run: composer dump-autoload --optimize --strict-psr
