@@ -11,7 +11,7 @@ namespace Attestwire\Exception;
  * `{"error": "...", "message": "...", "docs": "...", ...}`, as documented at
  * https://api.attestwire.com/docs.
  */
-final class ApiException extends AttestwireException
+class ApiException extends AttestwireException
 {
     public function __construct(
         private readonly int $status,

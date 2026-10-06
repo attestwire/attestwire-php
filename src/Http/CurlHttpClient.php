@@ -33,8 +33,24 @@ final class CurlHttpClient implements HttpClientInterface
             $headerLines[] = sprintf('%s: %s', $name, $value);
         }
 
+        // Response headers, for generate(): the PDF's file name, its language and
+        // whether it is the free plan's watermarked preview. After a redirect
+        // only the last response's headers are kept.
+        $responseHeaders = [];
+        $collectHeader = static function ($curl, string $line) use (&$responseHeaders): int {
+            if (preg_match('#^HTTP/\S+\s#', $line) === 1) {
+                $responseHeaders = [];
+            } elseif (str_contains($line, ':')) {
+                [$name, $value] = explode(':', $line, 2);
+                $responseHeaders[strtolower(trim($name))] = trim($value);
+            }
+
+            return strlen($line);
+        };
+
         $options = [
             CURLOPT_HTTPHEADER => $headerLines,
+            CURLOPT_HEADERFUNCTION => $collectHeader,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER => false,
             CURLOPT_FOLLOWLOCATION => true,
@@ -69,6 +85,6 @@ final class CurlHttpClient implements HttpClientInterface
         $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
         curl_close($handle);
 
-        return new HttpResponse($status, (string) $responseBody);
+        return new HttpResponse($status, (string) $responseBody, $responseHeaders);
     }
 }

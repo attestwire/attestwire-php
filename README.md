@@ -1,17 +1,89 @@
 # attestwire/attestwire-php
 
-Validate EN 16931 e-invoices — XRechnung, Factur-X/ZUGFeRD, Peppol BIS 3 —
-from PHP, against the hosted Attestwire API. PHP 8.1+, requiring only
-`ext-json` and `ext-curl`.
+Create and check EN 16931 e-invoices — XRechnung, Factur-X/ZUGFeRD, Peppol
+BIS 3 — from PHP, with the hosted Attestwire API. Describe the invoice as an
+array and get the XML or a ready-to-send Factur-X / ZUGFeRD PDF; hand over an
+invoice you received and get every problem in it, with the fix. PHP 8.1+,
+requiring only `ext-json` and `ext-curl`.
 
 ```bash
 composer require attestwire/attestwire-php
 ```
 
+## Create an e-invoice
+
 ```php
 use Attestwire\Client;
 
 $client = new Client($_ENV['ATTESTWIRE_API_KEY']);
+
+$invoice = [
+    'profile' => 'facturx-en16931',   // or 'xrechnung-ubl', 'xrechnung-cii', 'peppol-bis-3', 'auto'
+    'invoiceNumber' => '2026-000142',
+    'issueDate' => '2026-08-09',
+    'currency' => 'EUR',
+    'seller' => [
+        'name' => 'Acme GmbH',
+        'vatId' => 'DE123456789',
+        'address' => ['line1' => 'Chausseestr. 1', 'city' => 'Berlin', 'postalCode' => '10115', 'countryCode' => 'DE'],
+        'contact' => ['name' => 'Buchhaltung', 'phone' => '+49 30 1234567', 'email' => 'rechnungen@acme.example'],
+    ],
+    'buyer' => [
+        'name' => 'Client Exemple SARL',
+        'vatId' => 'FR40303265045',
+        'address' => ['line1' => '1 rue de la Paix', 'city' => 'Paris', 'postalCode' => '75002', 'countryCode' => 'FR'],
+    ],
+    'vatScenario' => 'intra-eu-services',   // say what happened; the VAT codes are filled in
+    'payment' => ['iban' => 'DE02120300000000202051'],
+    'lines' => [
+        ['id' => '1', 'description' => 'Consulting, August 2026', 'quantity' => 10, 'unitCode' => 'HUR', 'unitPrice' => 150],
+    ],
+];
+
+$pdf = $client->generate($invoice, 'pdf');
+file_put_contents($pdf->filename, $pdf->content());   // 2026-000142.pdf
+
+$xml = $client->generate(['profile' => 'xrechnung-ubl', 'buyerReference' => 'PO-4711'] + $invoice);
+echo $xml->xml;
+```
+
+The `'pdf'` format returns a Factur-X / ZUGFeRD PDF: a readable invoice page
+(in German, French or English, from the seller's country unless you pass
+`['language' => 'fr']` as the third argument), written as PDF/A-3B with the
+CII XML embedded, so the customer's software reads the data and a person reads
+the page. It carries the `facturx-en16931` profile. The default `'xml'` format
+returns the XML alone, for whichever profile the invoice names.
+
+The invoice is an array in the shape the
+[`@attestwire/en16931`](https://www.npmjs.com/package/@attestwire/en16931)
+package calls `InvoiceInput`, documented field by field at
+[api.attestwire.com/docs#input](https://api.attestwire.com/docs#input).
+Totals are calculated from the lines; you do not send them.
+
+**An invoice that breaks a rule is not generated.** `generate()` throws
+`Attestwire\Exception\InvalidInvoiceException`, and `getResult()` is what
+`validate()` would have returned: each rule, what is wrong and how to fix it.
+
+```php
+use Attestwire\Exception\InvalidInvoiceException;
+
+try {
+    $client->generate($invoice, 'pdf');
+} catch (InvalidInvoiceException $e) {
+    foreach ($e->getResult()->errors() as $finding) {
+        echo "{$finding->rule}: {$finding->fix}\n";
+    }
+}
+```
+
+Generation needs an API key; [get one free](https://api.attestwire.com/docs#auth),
+or use `new Client('demo')` to try it without signing up. On the free plan the
+PDF is a watermarked preview (`$pdf->watermarked` is `true`); paid plans get
+it clean. A refused invoice costs nothing.
+
+## Check an e-invoice
+
+```php
 $result = $client->validate(file_get_contents('invoice.xml'));
 
 if (!$result->valid) {
@@ -30,8 +102,8 @@ file" step. Pass the bytes you already have.
 ## Two packages in one
 
 - **`Attestwire\Client`** — a thin wrapper around
-  `POST https://api.attestwire.com/v1/validate`. Use it directly, or as the
-  transport under your own code.
+  `POST https://api.attestwire.com/v1/validate` and `/v1/generate`. Use it
+  directly, or as the transport under your own code.
 - **`Attestwire\InvoiceSuite\AttestwireDocumentValidator`** — an adapter for
   [horstoeko/invoicesuite](https://github.com/horstoeko/invoicesuite), so its
   users can validate with Attestwire the same way they'd use its built-in
@@ -88,14 +160,18 @@ final class Location
 
 ## Errors you handle vs. exceptions you don't expect
 
-A **non-compliant invoice is never an exception.** `validate()` returns
-normally with `$result->valid === false` and the findings that explain
-why — that's the whole point of the package. What *can* throw:
+A **non-compliant invoice is never an exception from `validate()`.** It
+returns normally with `$result->valid === false` and the findings that
+explain why — that's the whole point of the package. `generate()` has nothing
+to return for one, so it throws `InvalidInvoiceException` with the same
+findings. What *can* throw:
 
 | Exception | When |
 | --- | --- |
+| `Attestwire\Exception\InvalidInvoiceException` | `generate()` only: the invoice breaks a rule, so nothing was generated (HTTP 422). `getResult()` is the `ValidationResult`, with each finding's fix. A subclass of `ApiException`. |
 | `Attestwire\Exception\ApiException` | The API answered with an HTTP error status: `getStatus()`, `getErrorCode()`, `getMessage()`, `getDocsUrl()`, `getUpgradeUrl()` (e.g. `401 invalid_api_key`, `413 too_large`, `429 rate_limited`). |
 | `Attestwire\Exception\AttestwireException` | No API key available anywhere, or the request never reached the API (DNS, connection refused, timeout). Base class of `ApiException` too, if you want to catch either. |
+| `InvalidArgumentException` | `generate()`'s arguments are wrong: a format other than `'xml'` or `'pdf'`, page options without `'pdf'`, or a string that is not a JSON object. |
 
 ## Configuration
 

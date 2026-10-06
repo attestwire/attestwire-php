@@ -1,6 +1,6 @@
 {
     "name": "attestwire/attestwire-php",
-    "description": "Validate EN 16931 e-invoices (XRechnung, Factur-X/ZUGFeRD, Peppol BIS 3) with the hosted Attestwire API. Includes an adapter for horstoeko/invoicesuite's validator so its users can validate without a Java KoSIT install.",
+    "description": "Create and validate EN 16931 e-invoices (XRechnung, Factur-X/ZUGFeRD PDFs, Peppol BIS 3) with the hosted Attestwire API. Includes an adapter for horstoeko/invoicesuite's validator so its users can validate without a Java KoSIT install.",
     "type": "library",
     "license": "MIT",
     "keywords": [
