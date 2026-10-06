@@ -72,9 +72,12 @@ final class ClientGenerateTest extends TestCase
     {
         $fake = (new FakeHttpClient())->queue(new HttpResponse(200, self::XML_ENVELOPE));
 
-        (new Client('k', $fake))->generate((string) json_encode(self::INVOICE));
+        $text = (string) json_encode(self::INVOICE);
+        (new Client('k', $fake))->generate($text);
 
-        self::assertSame(self::INVOICE, json_decode($fake->requests[0]['body'], true));
+        // What the text says, number types included: json_encode writes 150.0
+        // as 150, and the client sends 150, not the array the text came from.
+        self::assertSame(json_decode($text, true), json_decode($fake->requests[0]['body'], true));
     }
 
     public function testPdfComesBackAsBytesWithWhatTheHeadersSay(): void
